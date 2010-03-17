@@ -191,17 +191,12 @@ static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
 
     while (cacheKey = [enumerator nextObject])
     {
-        NSMutableDictionary *cacheInfo = [self.diskCacheInfo objectForKey:cacheKey];
-        
-        if (cacheInfo)
-        {
-            NSNumber *cacheItemSize = [(NSMutableDictionary *)[self.diskCacheInfo objectForKey:kSDURLCacheInfoSizesKey] objectForKey:cacheKey];
-            [accesses removeObjectForKey:cacheKey];
-            [sizes removeObjectForKey:cacheKey];
-            [[NSFileManager defaultManager] removeItemAtPath:[diskCachePath stringByAppendingPathComponent:cacheKey] error:NULL];
-            diskCacheUsage -= [cacheItemSize unsignedIntegerValue];
-            [self.diskCacheInfo setObject:[NSNumber numberWithUnsignedInteger:diskCacheUsage] forKey:kSDURLCacheInfoDiskUsageKey];
-        }        
+        NSUInteger cacheItemSize = [[sizes objectForKey:cacheKey] unsignedIntegerValue];
+        [accesses removeObjectForKey:cacheKey];
+        [sizes removeObjectForKey:cacheKey];
+        [[NSFileManager defaultManager] removeItemAtPath:[diskCachePath stringByAppendingPathComponent:cacheKey] error:NULL];
+        diskCacheUsage -= cacheItemSize;
+        [self.diskCacheInfo setObject:[NSNumber numberWithUnsignedInteger:diskCacheUsage] forKey:kSDURLCacheInfoDiskUsageKey];
     }
 
     [pool drain];
