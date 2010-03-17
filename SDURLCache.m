@@ -328,28 +328,35 @@ static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
 
 - (NSCachedURLResponse *)cachedResponseForRequest:(NSURLRequest *)request
 {
-    NSString *cacheKey = [SDURLCache cacheKeyForURL:request.URL];
-    NSDate *expirationDate = [(NSDictionary *)[self.diskCacheInfo objectForKey:kSDURLCacheInfoExpiresKey] objectForKey:cacheKey];
-
-    if (expirationDate && [expirationDate timeIntervalSinceNow] < 0)
-    {
-        [self removeCachedResponseForRequest:request];
-        return [super cachedResponseForRequest:request];
-    }
-
     NSCachedURLResponse *memoryResponse = [super cachedResponseForRequest:request];
     if (memoryResponse)
     {
         return memoryResponse;
     }
 
-    NSCachedURLResponse *cachedResponse = [NSKeyedUnarchiver unarchiveObjectWithFile:[diskCachePath stringByAppendingPathComponent:cacheKey]];
-    if (cachedResponse)
+    NSString *cacheKey = [SDURLCache cacheKeyForURL:request.URL];
+
+    // We obey to cache expiration rules only if the request cache policy is set to use protocol cache policy.
+    // All other policies ask to ignore expiration (maybe we should handle max-fresh, max-stale etc. there)
+    if (request.cachePolicy == NSURLRequestUseProtocolCachePolicy)
+    {
+        NSDate *expirationDate = [(NSDictionary *)[self.diskCacheInfo objectForKey:kSDURLCacheInfoExpiresKey] objectForKey:cacheKey];
+
+        if (expirationDate && [expirationDate timeIntervalSinceNow] < 0)
+        {
+            // It is needless to clean the expired cache entry here. There's good chances that we will have a store request pretty
+            //soon with a fresh entry. Don't vast IOs for nothing, flash and battery life is is countable on iPhone OS devices.
+            return nil;
+        }
+    }
+
+    NSCachedURLResponse *diskResponse = [NSKeyedUnarchiver unarchiveObjectWithFile:[diskCachePath stringByAppendingPathComponent:cacheKey]];
+    if (diskResponse)
     {
         [(NSMutableDictionary *)[self.diskCacheInfo objectForKey:kSDURLCacheInfoAccessesKey] setObject:[NSDate date] forKey:cacheKey];
         // Store the response to memory cache for potential future requests
-        [super storeCachedResponse:cachedResponse forRequest:request];
-        return cachedResponse;
+        [super storeCachedResponse:diskResponse forRequest:request];
+        return diskResponse;
     }
 
     return nil;
