@@ -17,6 +17,27 @@ static NSString *const kSDURLCacheInfoExpiresKey = @"expires";
 static NSString *const kSDURLCacheInfoAccessesKey = @"accesses";
 static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
 
+@implementation NSCachedURLResponse(NSCoder)
+
+- (void)encodeWithCoder:(NSCoder *)coder
+{
+    [coder encodeDataObject:self.data];
+    [coder encodeObject:self.response forKey:@"response"];
+    [coder encodeObject:self.userInfo forKey:@"userInfo"];
+    [coder encodeInt:self.storagePolicy forKey:@"storagePolicy"];
+}
+
+- (id)initWithCoder:(NSCoder *)coder
+{
+    return [self initWithResponse:[coder decodeObjectForKey:@"response"]
+                             data:[coder decodeDataObject]
+                         userInfo:[coder decodeObjectForKey:@"userInfo"]
+                    storagePolicy:[coder decodeIntForKey:@"storagePolicy"]];
+}
+
+@end
+
+
 @interface SDURLCache ()
 @property (nonatomic, retain) NSString *diskCachePath;
 @property (nonatomic, retain) NSDictionary *diskCacheInfo;
@@ -313,7 +334,7 @@ static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
     if (cachedResponse)
     {
         [(NSMutableDictionary *)[diskCacheInfo objectForKey:kSDURLCacheInfoAccessesKey] setObject:[NSDate date] forKey:cacheKey];
-        return cachedResponse;
+        return [cachedResponse retain];
     }
 
     return nil;
