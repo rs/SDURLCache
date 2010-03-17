@@ -12,7 +12,6 @@
 static NSTimeInterval const kSDURLCacheInfoDefaultMinCacheInterval = 5 * 60; // 5 minute
 static NSString *const kSDURLCacheInfoFileName = @"cacheInfo.plist";
 static NSString *const kSDURLCacheInfoDiskUsageKey = @"diskUsage";
-static NSString *const kSDURLCacheInfoExpiresKey = @"expires";
 static NSString *const kSDURLCacheInfoAccessesKey = @"accesses";
 static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
 
@@ -136,7 +135,6 @@ static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
         {
             diskCacheInfo = [[NSMutableDictionary alloc] initWithObjectsAndKeys:
                              [NSNumber numberWithUnsignedInt:0], kSDURLCacheInfoDiskUsageKey,
-                             [NSMutableDictionary dictionary], kSDURLCacheInfoExpiresKey,
                              [NSMutableDictionary dictionary], kSDURLCacheInfoAccessesKey,
                              [NSMutableDictionary dictionary], kSDURLCacheInfoSizesKey,
                              nil];
@@ -167,7 +165,6 @@ static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
     NSEnumerator *enumerator = [cacheKeys objectEnumerator];
     NSString *cacheKey;
 
-    NSMutableDictionary *expirations = [self.diskCacheInfo objectForKey:kSDURLCacheInfoExpiresKey];
     NSMutableDictionary *accesses = [self.diskCacheInfo objectForKey:kSDURLCacheInfoAccessesKey];
     NSMutableDictionary *sizes = [self.diskCacheInfo objectForKey:kSDURLCacheInfoSizesKey];
 
@@ -178,7 +175,6 @@ static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
         if (cacheInfo)
         {
             NSNumber *cacheItemSize = [(NSMutableDictionary *)[self.diskCacheInfo objectForKey:kSDURLCacheInfoSizesKey] objectForKey:cacheKey];
-            [expirations removeObjectForKey:cacheKey];
             [accesses removeObjectForKey:cacheKey];
             [sizes removeObjectForKey:cacheKey];
             [[NSFileManager defaultManager] removeItemAtPath:[diskCachePath stringByAppendingPathComponent:cacheKey] error:NULL];
@@ -192,40 +188,15 @@ static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
 
 - (void)balanceDiskUsage
 {
-    // Clean all expired keys
-    NSDictionary *expirations = [self.diskCacheInfo objectForKey:kSDURLCacheInfoExpiresKey];
+    // Apply LRU cache eviction algorithm while disk usage outreach capacity
+    NSDictionary *sizes = [self.diskCacheInfo objectForKey:kSDURLCacheInfoSizesKey];
     NSMutableArray *keysToRemove = [NSMutableArray array];
 
-    NSArray *sortedKeys = [expirations keysSortedByValueUsingSelector:@selector(compare:)];
-    NSEnumerator *enumerator = [sortedKeys objectEnumerator];
-    NSString *cacheKey;    
-    while ((cacheKey = [enumerator nextObject]) && [(NSDate *)[expirations objectForKey:cacheKey] timeIntervalSinceNow] < 0)
-    {
-        [keysToRemove addObject:cacheKey];
-    }
-
-    if ([keysToRemove count] > 0)
-    {
-        [self removeCachedResponseForCachedKeys:keysToRemove];
-
-        if (diskCacheUsage < self.diskCapacity)
-        {
-            [self saveCacheInfo];
-            return;
-        }
-    }
-    else if(diskCacheUsage < self.diskCapacity)
-    {
-        return;
-    }
-
-    // Clean least recently used keys until disk usage outreach capacity
-    NSDictionary *sizes = [self.diskCacheInfo objectForKey:kSDURLCacheInfoSizesKey];
-    keysToRemove = [NSMutableArray array];
-
     NSInteger capacityToSave = diskCacheUsage - self.diskCapacity;
-    sortedKeys = [(NSDictionary *)[self.diskCacheInfo objectForKey:kSDURLCacheInfoAccessesKey] keysSortedByValueUsingSelector:@selector(compare:)];
-    enumerator = [sortedKeys objectEnumerator];
+    NSArray *sortedKeys = [(NSDictionary *)[self.diskCacheInfo objectForKey:kSDURLCacheInfoAccessesKey] keysSortedByValueUsingSelector:@selector(compare:)];
+    NSEnumerator *enumerator = [sortedKeys objectEnumerator];
+    NSString *cacheKey;
+
     while (capacityToSave > 0 && (cacheKey = [enumerator nextObject]))
     {
         [keysToRemove addObject:cacheKey];
@@ -241,7 +212,6 @@ static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
 {
     NSURLRequest *request = [context objectForKey:@"request"];
     NSCachedURLResponse *cachedResponse = [context objectForKey:@"cachedResponse"];
-    NSDate *expirationDate = [context objectForKey:@"expirationDate"];
     
     NSString *cacheKey = [SDURLCache cacheKeyForURL:request.URL];
     NSString *cacheFilePath = [diskCachePath stringByAppendingPathComponent:cacheKey];
@@ -262,7 +232,6 @@ static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
     
     
     // Update cache info for the stored item
-    [(NSMutableDictionary *)[self.diskCacheInfo objectForKey:kSDURLCacheInfoExpiresKey] setObject:expirationDate forKey:cacheKey];
     [(NSMutableDictionary *)[self.diskCacheInfo objectForKey:kSDURLCacheInfoAccessesKey] setObject:[NSDate date] forKey:cacheKey];
     [(NSMutableDictionary *)[self.diskCacheInfo objectForKey:kSDURLCacheInfoSizesKey] setObject:cacheItemSize forKey:cacheKey];
     
@@ -346,27 +315,23 @@ static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
 
     NSString *cacheKey = [SDURLCache cacheKeyForURL:request.URL];
 
-    // We obey to cache expiration rules only if the request cache policy is set to use protocol cache policy.
-    // All other policies ask to ignore expiration (maybe we should handle max-fresh, max-stale etc. there)
-    if (request.cachePolicy == NSURLRequestUseProtocolCachePolicy)
+    // NOTE: We don't handle expiration here as even staled cache data is necessary for NSURLConnection to handle cache revalidation.
+    //       Staled cache data is also needed for cachePolicies which force the use of the cache.
+    NSMutableDictionary *accesses = [self.diskCacheInfo objectForKey:kSDURLCacheInfoAccessesKey];
+    if ([accesses objectForKey:cacheKey]) // OPTI: Check for cache-hit in a in-memory dictionnary before to hit the FS
     {
-        NSDate *expirationDate = [(NSDictionary *)[self.diskCacheInfo objectForKey:kSDURLCacheInfoExpiresKey] objectForKey:cacheKey];
-
-        if (expirationDate && [expirationDate timeIntervalSinceNow] < 0)
+        NSCachedURLResponse *diskResponse = [NSKeyedUnarchiver unarchiveObjectWithFile:[diskCachePath stringByAppendingPathComponent:cacheKey]];
+        if (diskResponse)
         {
-            // It is needless to clean the expired cache entry here. There's good chances that we will have a store request pretty
-            //soon with a fresh entry. Don't vast IOs for nothing, flash and battery life is is countable on iPhone OS devices.
-            return nil;
-        }
-    }
+            // OPTI: Log the entry last access time for LRU cache eviction algorithm but don't save the dictionary
+            //       on disk now in order to save IO and time
+            [accesses setObject:[NSDate date] forKey:cacheKey];
+            diskCacheInfoDirty = YES;
 
-    NSCachedURLResponse *diskResponse = [NSKeyedUnarchiver unarchiveObjectWithFile:[diskCachePath stringByAppendingPathComponent:cacheKey]];
-    if (diskResponse)
-    {
-        [(NSMutableDictionary *)[self.diskCacheInfo objectForKey:kSDURLCacheInfoAccessesKey] setObject:[NSDate date] forKey:cacheKey];
-        // Store the response to memory cache for potential future requests
-        [super storeCachedResponse:diskResponse forRequest:request];
-        return diskResponse;
+            // OPTI: Store the response to memory cache for potential future requests
+            [super storeCachedResponse:diskResponse forRequest:request];
+            return diskResponse;
+        }
     }
 
     return nil;
