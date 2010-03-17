@@ -26,4 +26,9 @@
  */
 @property (nonatomic, assign) NSTimeInterval minCacheInterval;
 
+/*
+ * Return a default cache file path to be used at cache initialization initialization
+ */
++ (NSString *)defaultCachePath;
+
 @end

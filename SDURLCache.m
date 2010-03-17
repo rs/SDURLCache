@@ -250,6 +250,14 @@ static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
 {
 }
 
+#pragma mark SDURLCache
+
++ (NSString *)defaultCachePath
+{
+    NSArray *paths = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES);
+    return [[paths objectAtIndex:0] stringByAppendingPathComponent:@"SDURLCache"];
+}
+
 #pragma mark NSURLCache
 
 - (id)initWithMemoryCapacity:(NSUInteger)memoryCapacity diskCapacity:(NSUInteger)diskCapacity diskPath:(NSString *)path
