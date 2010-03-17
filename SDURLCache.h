@@ -27,7 +27,8 @@
 @property (nonatomic, assign) NSTimeInterval minCacheInterval;
 
 /*
- * Return a default cache file path to be used at cache initialization initialization
+ * Returns a default cache director path to be used at cache initialization. The generated path directory
+ * will be located in the application's cache directory and thus won't be synced by iTunes.
  */
 + (NSString *)defaultCachePath;
 

@@ -50,7 +50,7 @@ static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
 
 #pragma mark SDURLCache (private)
 
-- (NSString *)cacheKeyForURL:(NSURL *)url
++ (NSString *)cacheKeyForURL:(NSURL *)url
 {
     const char *str = [url.absoluteString UTF8String];
     unsigned char r[CC_MD5_DIGEST_LENGTH];
@@ -213,7 +213,7 @@ static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
     NSCachedURLResponse *cachedResponse = [context objectForKey:@"cachedResponse"];
     NSDate *expirationDate = [context objectForKey:@"expirationDate"];
     
-    NSString *cacheKey = [self cacheKeyForURL:request.URL];
+    NSString *cacheKey = [SDURLCache cacheKeyForURL:request.URL];
     NSString *cacheFilePath = [diskCachePath stringByAppendingPathComponent:cacheKey];
     
     // Archive the cached response on disk
@@ -323,7 +323,7 @@ static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
 
 - (NSCachedURLResponse *)cachedResponseForRequest:(NSURLRequest *)request
 {
-    NSString *cacheKey = [self cacheKeyForURL:request.URL];
+    NSString *cacheKey = [SDURLCache cacheKeyForURL:request.URL];
     NSDate *expirationDate = [(NSDictionary *)[diskCacheInfo objectForKey:kSDURLCacheInfoExpiresKey] objectForKey:cacheKey];
 
     if (expirationDate && [expirationDate timeIntervalSinceNow] < 0)
@@ -370,7 +370,7 @@ static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
 - (void)removeCachedResponseForRequest:(NSURLRequest *)request
 {
     [super removeCachedResponseForRequest:request];
-    [self removeCachedResponseForCachedKeys:[NSArray arrayWithObject:[self cacheKeyForURL:request.URL]]];
+    [self removeCachedResponseForCachedKeys:[NSArray arrayWithObject:[SDURLCache cacheKeyForURL:request.URL]]];
     [self saveCacheInfo];
 }
 
