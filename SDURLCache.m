@@ -106,7 +106,7 @@ static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
 
 - (void)saveCacheInfo
 {
-    [diskCacheInfo writeToFile:[diskCachePath stringByAppendingFormat:kSDURLCacheInfoFileName] atomically:YES];
+    [diskCacheInfo writeToFile:[diskCachePath stringByAppendingPathComponent:kSDURLCacheInfoFileName] atomically:YES];
 }
 
 - (void)removeCachedResponseForCachedKeys:(NSArray *)cacheKeys
@@ -243,7 +243,7 @@ static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
             [[NSFileManager defaultManager] createDirectoryAtPath:diskCachePath attributes:nil];
         }
 
-        self.diskCacheInfo = [NSMutableDictionary dictionaryWithContentsOfFile:[diskCachePath stringByAppendingFormat:kSDURLCacheInfoFileName]];
+        self.diskCacheInfo = [NSMutableDictionary dictionaryWithContentsOfFile:[diskCachePath stringByAppendingPathComponent:kSDURLCacheInfoFileName]];
         if (!self.diskCacheInfo)
         {
             self.diskCacheInfo = [NSMutableDictionary dictionaryWithObjectsAndKeys:
