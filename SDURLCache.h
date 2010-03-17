@@ -13,9 +13,12 @@
     @private
     NSString *diskCachePath;
     NSMutableDictionary *diskCacheInfo;
+    NSTimer *saveCacheInfoTimer;
+    NSOperation *autoCacheInfoSaveOperation;
+    BOOL diskCacheInfoDirty;
     NSUInteger diskCacheUsage;
     NSTimeInterval minCacheInterval;
-    NSOperationQueue *cacheInQueue;
+    NSOperationQueue *ioQueue;
 }
 
 /*

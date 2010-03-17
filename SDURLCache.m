@@ -39,12 +39,13 @@ static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
 @interface SDURLCache ()
 @property (nonatomic, retain) NSString *diskCachePath;
 @property (nonatomic, readonly) NSMutableDictionary *diskCacheInfo;
-@property (nonatomic, retain) NSOperationQueue *cacheInQueue;
+@property (nonatomic, retain) NSOperationQueue *ioQueue;
+@property (retain) NSOperation *autoCacheInfoSaveOperation;
 @end
 
 @implementation SDURLCache
 
-@synthesize diskCachePath, minCacheInterval, cacheInQueue;
+@synthesize diskCachePath, minCacheInterval, ioQueue, autoCacheInfoSaveOperation;
 @dynamic diskCacheInfo;
 
 #pragma mark SDURLCache (tools)
@@ -70,7 +71,7 @@ static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
         // Uncacheable response
         return nil;
     }
-        
+
     // Look at info from the Cache-Control: max-age=n header
     NSString *cacheControl = [headers objectForKey:@"Cache-Control"];
     if (cacheControl)
@@ -98,11 +99,10 @@ static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
                 {
                     return nil;
                 }
-
             }
         }
     }
-    
+
     // If not Cache-Control found, look at the Expires header
     NSString *expires = [headers objectForKey:@"Expires"];
     if (expires)
@@ -138,8 +138,11 @@ static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
                              [NSMutableDictionary dictionary], kSDURLCacheInfoAccessesKey,
                              [NSMutableDictionary dictionary], kSDURLCacheInfoSizesKey,
                              nil];
-        }        
+        }
+        diskCacheInfoDirty = NO;
     }
+
+    saveCacheInfoTimer = [[NSTimer scheduledTimerWithTimeInterval:5 target:self selector:@selector(autoCacheInfoSaver) userInfo:nil repeats:YES] retain];
 
     return diskCacheInfo;
 }
@@ -156,6 +159,24 @@ static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
 {
     [self createDiskCachePath];
     [self.diskCacheInfo writeToFile:[diskCachePath stringByAppendingPathComponent:kSDURLCacheInfoFileName] atomically:YES];
+    diskCacheInfoDirty = NO;
+
+    // If an auto save of the cacheInfo dictionnary is scheduled, cancel it as we just did it
+    if (!autoCacheInfoSaveOperation.isExecuting) // Check if it's not the current operation
+    {
+        [autoCacheInfoSaveOperation cancel];
+        self.autoCacheInfoSaveOperation = nil;
+    }
+}
+
+- (void)autoCacheInfoSaver
+{
+    // If cacheInfo dictionnary is dirty, save it in an operation if another same operation is not already sceduled
+    if (diskCacheInfoDirty && (!autoCacheInfoSaveOperation || autoCacheInfoSaveOperation.isFinished))
+    {
+        self.autoCacheInfoSaveOperation = [[[NSInvocationOperation alloc] initWithTarget:self selector:@selector(saveCacheInfo) object:nil] autorelease];
+        [ioQueue addOperation:autoCacheInfoSaveOperation];
+    }
 }
 
 - (void)removeCachedResponseForCachedKeys:(NSArray *)cacheKeys
@@ -263,8 +284,8 @@ static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
         self.diskCachePath = path;
 
         // Init the operation queue
-        self.cacheInQueue = [[[NSOperationQueue alloc] init] autorelease];
-        cacheInQueue.maxConcurrentOperationCount = 1; // used to streamline operations in a separate thread        
+        self.ioQueue = [[[NSOperationQueue alloc] init] autorelease];
+        ioQueue.maxConcurrentOperationCount = 1; // used to streamline operations in a separate thread        
     }
 
     return self;
@@ -295,13 +316,13 @@ static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
             return;
         }
 
-        [cacheInQueue addOperation:[[[NSInvocationOperation alloc] initWithTarget:self 
-                                                                         selector:@selector(storeToDisk:)
-                                                                           object:[NSDictionary dictionaryWithObjectsAndKeys:
-                                                                                   cachedResponse, @"cachedResponse",
-                                                                                   request, @"request",
-                                                                                   expirationDate, @"expirationDate",
-                                                                                   nil]] autorelease]];
+        [ioQueue addOperation:[[[NSInvocationOperation alloc] initWithTarget:self 
+                                                                    selector:@selector(storeToDisk:)
+                                                                      object:[NSDictionary dictionaryWithObjectsAndKeys:
+                                                                              cachedResponse, @"cachedResponse",
+                                                                              request, @"request",
+                                                                              expirationDate, @"expirationDate",
+                                                                              nil]] autorelease]];
     }
 }
 
@@ -358,9 +379,12 @@ static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
 
 - (void)dealloc
 {
+    [saveCacheInfoTimer invalidate];
+    [saveCacheInfoTimer release];
+    [autoCacheInfoSaveOperation release];
     [diskCachePath release];
     [diskCacheInfo release];
-    [cacheInQueue release];
+    [ioQueue release];
     [super dealloc];
 }
 
