@@ -7,7 +7,6 @@
 //
 
 #import "SDURLCache.h"
-#import <UIKit/UIKit.h>
 #import <CommonCrypto/CommonDigest.h>
 
 static NSTimeInterval const kSDURLCacheInfoDefaultMinCacheInterval = 5 * 60; // 5 minute
@@ -244,12 +243,6 @@ static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
     }
 }
 
-#pragma mark SDURLCache (notification handlers)
-
-- (void)applicationWillTerminate
-{
-}
-
 #pragma mark SDURLCache
 
 + (NSString *)defaultCachePath
@@ -286,11 +279,6 @@ static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
         // Init the operation queue
         self.cacheInQueue = [[[NSOperationQueue alloc] init] autorelease];
         cacheInQueue.maxConcurrentOperationCount = 1; // used to streamline operations in a separate thread        
-
-        [[NSNotificationCenter defaultCenter] addObserver:self
-                                                 selector:@selector(applicationWillTerminate)
-                                                     name:UIApplicationWillTerminateNotification  
-                                                   object:nil];        
     }
 
     return self;
@@ -383,7 +371,6 @@ static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
 
 - (void)dealloc
 {
-    [[NSNotificationCenter defaultCenter] removeObserver:self];
     [diskCachePath release];
     [diskCacheInfo release];
     [cacheInQueue release];
