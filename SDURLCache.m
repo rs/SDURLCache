@@ -334,7 +334,9 @@ static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
     if (cachedResponse)
     {
         [(NSMutableDictionary *)[diskCacheInfo objectForKey:kSDURLCacheInfoAccessesKey] setObject:[NSDate date] forKey:cacheKey];
-        return [cachedResponse retain];
+        // Store the response to memory cache for potential future requests
+        [super storeCachedResponse:cachedResponse forRequest:request];
+        return cachedResponse;
     }
 
     return nil;
