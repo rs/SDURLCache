@@ -303,6 +303,16 @@ static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
 
 - (void)storeCachedResponse:(NSCachedURLResponse *)cachedResponse forRequest:(NSURLRequest *)request
 {
+    if (request.cachePolicy == NSURLRequestReloadIgnoringLocalCacheData
+        || request.cachePolicy == NSURLRequestReloadIgnoringLocalAndRemoteCacheData
+        || request.cachePolicy == NSURLRequestReloadIgnoringCacheData)
+    {
+        // When cache is ignored for read, it's a good idea not to store the result as well as this option
+        // have big chance to be used every times in the future for the same request.
+        // NOTE: This is a change regarding default URLCache behavior
+        return;
+    }
+
     [super storeCachedResponse:cachedResponse forRequest:request];
 
     if (cachedResponse.storagePolicy == NSURLCacheStorageAllowed
