@@ -40,12 +40,12 @@ static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
 @property (nonatomic, retain) NSString *diskCachePath;
 @property (nonatomic, readonly) NSMutableDictionary *diskCacheInfo;
 @property (nonatomic, retain) NSOperationQueue *ioQueue;
-@property (retain) NSOperation *autoCacheInfoSaveOperation;
+@property (retain) NSOperation *periodicMaintenanceOperation;
 @end
 
 @implementation SDURLCache
 
-@synthesize diskCachePath, minCacheInterval, ioQueue, autoCacheInfoSaveOperation;
+@synthesize diskCachePath, minCacheInterval, ioQueue, periodicMaintenanceOperation;
 @dynamic diskCacheInfo;
 
 #pragma mark SDURLCache (tools)
@@ -140,9 +140,13 @@ static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
                              nil];
         }
         diskCacheInfoDirty = NO;
-    }
 
-    saveCacheInfoTimer = [[NSTimer scheduledTimerWithTimeInterval:5 target:self selector:@selector(autoCacheInfoSaver) userInfo:nil repeats:YES] retain];
+        periodicMaintenanceTimer = [[NSTimer scheduledTimerWithTimeInterval:5
+                                                                     target:self
+                                                                   selector:@selector(periodicMaintenance)
+                                                                   userInfo:nil
+                                                                    repeats:YES] retain];        
+    }
 
     return diskCacheInfo;
 }
@@ -160,23 +164,6 @@ static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
     [self createDiskCachePath];
     [self.diskCacheInfo writeToFile:[diskCachePath stringByAppendingPathComponent:kSDURLCacheInfoFileName] atomically:YES];
     diskCacheInfoDirty = NO;
-
-    // If an auto save of the cacheInfo dictionnary is scheduled, cancel it as we just did it
-    if (!autoCacheInfoSaveOperation.isExecuting) // Check if it's not the current operation
-    {
-        [autoCacheInfoSaveOperation cancel];
-        self.autoCacheInfoSaveOperation = nil;
-    }
-}
-
-- (void)autoCacheInfoSaver
-{
-    // If cacheInfo dictionnary is dirty, save it in an operation if another same operation is not already sceduled
-    if (diskCacheInfoDirty && (!autoCacheInfoSaveOperation || autoCacheInfoSaveOperation.isFinished))
-    {
-        self.autoCacheInfoSaveOperation = [[[NSInvocationOperation alloc] initWithTarget:self selector:@selector(saveCacheInfo) object:nil] autorelease];
-        [ioQueue addOperation:autoCacheInfoSaveOperation];
-    }
 }
 
 - (void)removeCachedResponseForCachedKeys:(NSArray *)cacheKeys
@@ -204,6 +191,12 @@ static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
 
 - (void)balanceDiskUsage
 {
+    if (diskCacheUsage < self.diskCapacity)
+    {
+        // Already done
+        return;
+    }
+
     // Apply LRU cache eviction algorithm while disk usage outreach capacity
     NSDictionary *sizes = [self.diskCacheInfo objectForKey:kSDURLCacheInfoSizesKey];
     NSMutableArray *keysToRemove = [NSMutableArray array];
@@ -251,13 +244,26 @@ static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
     [(NSMutableDictionary *)[self.diskCacheInfo objectForKey:kSDURLCacheInfoAccessesKey] setObject:[NSDate date] forKey:cacheKey];
     [(NSMutableDictionary *)[self.diskCacheInfo objectForKey:kSDURLCacheInfoSizesKey] setObject:cacheItemSize forKey:cacheKey];
     
+    [self saveCacheInfo];
+}
+
+- (void)periodicMaintenance
+{
+    // If another same maintenance operation is already sceduled, cancel it so this new operation will be executed after other
+    // operations of the queue, so we can group more work together
+    [periodicMaintenanceOperation cancel];
+    self.periodicMaintenanceOperation = nil;
+
+    // If disk usage outrich capacity, run the cache eviction operation and if cacheInfo dictionnary is dirty, save it in an operation
     if (diskCacheUsage > self.diskCapacity)
     {
-        [self balanceDiskUsage];
+        self.periodicMaintenanceOperation = [[[NSInvocationOperation alloc] initWithTarget:self selector:@selector(balanceDiskUsage) object:nil] autorelease];
+        [ioQueue addOperation:periodicMaintenanceOperation];
     }
-    else
+    else if (diskCacheInfoDirty)
     {
-        [self saveCacheInfo];
+        self.periodicMaintenanceOperation = [[[NSInvocationOperation alloc] initWithTarget:self selector:@selector(saveCacheInfo) object:nil] autorelease];
+        [ioQueue addOperation:periodicMaintenanceOperation];
     }
 }
 
@@ -374,9 +380,9 @@ static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
 
 - (void)dealloc
 {
-    [saveCacheInfoTimer invalidate];
-    [saveCacheInfoTimer release];
-    [autoCacheInfoSaveOperation release];
+    [periodicMaintenanceTimer invalidate];
+    [periodicMaintenanceTimer release];
+    [periodicMaintenanceOperation release];
     [diskCachePath release];
     [diskCacheInfo release];
     [ioQueue release];
