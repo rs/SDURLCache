@@ -15,12 +15,12 @@ that's it, you instantly give on-disk HTTP request caching capability to your ap
     [NSURLCache setSharedURLCache:urlCache];
     [urlCache release];
 
-To save flash drive, SDURLCache doesn't cache on disk responses which cache max-age is lower than
-5 minutes by default. You can change this behavior by changing the `minCacheInterval` property.
+To save flash drive, SDURLCache doesn't cache on disk responses if cache expiration delay is lower
+than 5 minutes by default. You can change this behavior by changing the `minCacheInterval` property.
 
-Cache eviction is done automatically on cache-in, when disk capacity is outreached. All write disk
-operation like cache storing or evicting is done in a separated thread (using NSOperation) so it
-won't block the NSURLConnection run loop thread.
+Cache eviction is done automatically when disk capacity is outreached in a periodic maintenance
+thread. All disk write operations are done in a separated thread so they can't block the main run
+loop.
 
 To control the caching behavior, use the `NSURLRequest`'s `cachePolicy` property. If you want a
 response not to be cached on disk but still in memory, you can implement the `NSURLConnection`
