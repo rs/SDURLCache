@@ -41,6 +41,7 @@ static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
 @property (nonatomic, readonly) NSMutableDictionary *diskCacheInfo;
 @property (nonatomic, retain) NSOperationQueue *ioQueue;
 @property (retain) NSOperation *periodicMaintenanceOperation;
+- (void)periodicMaintenance;
 @end
 
 @implementation SDURLCache
@@ -176,7 +177,7 @@ static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
     NSMutableDictionary *accesses = [self.diskCacheInfo objectForKey:kSDURLCacheInfoAccessesKey];
     NSMutableDictionary *sizes = [self.diskCacheInfo objectForKey:kSDURLCacheInfoSizesKey];
 
-    while (cacheKey = [enumerator nextObject])
+    while ((cacheKey = [enumerator nextObject]))
     {
         NSUInteger cacheItemSize = [[sizes objectForKey:cacheKey] unsignedIntegerValue];
         [accesses removeObjectForKey:cacheKey];
