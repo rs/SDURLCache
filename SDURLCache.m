@@ -146,7 +146,7 @@ static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
                                                                      target:self
                                                                    selector:@selector(periodicMaintenance)
                                                                    userInfo:nil
-                                                                    repeats:YES] retain];        
+                                                                    repeats:YES] retain];
     }
 
     return diskCacheInfo;
@@ -157,7 +157,7 @@ static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
     if (![[NSFileManager defaultManager] fileExistsAtPath:diskCachePath])
     {
         [[NSFileManager defaultManager] createDirectoryAtPath:diskCachePath attributes:nil];
-    }    
+    }
 }
 
 - (void)saveCacheInfo
@@ -222,7 +222,7 @@ static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
 {
     NSURLRequest *request = [context objectForKey:@"request"];
     NSCachedURLResponse *cachedResponse = [context objectForKey:@"cachedResponse"];
-    
+
     NSString *cacheKey = [SDURLCache cacheKeyForURL:request.URL];
     NSString *cacheFilePath = [diskCachePath stringByAppendingPathComponent:cacheKey];
 
@@ -234,17 +234,17 @@ static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
         // Caching failed for some reason
         return;
     }
-    
+
     // Update disk usage info
     NSNumber *cacheItemSize = [[[NSFileManager defaultManager] fileAttributesAtPath:cacheFilePath traverseLink:NO] objectForKey:NSFileSize];
     diskCacheUsage += [cacheItemSize unsignedIntegerValue];
-    [self.diskCacheInfo setObject:[NSNumber numberWithUnsignedInteger:diskCacheUsage] forKey:kSDURLCacheInfoDiskUsageKey];        
-    
-    
+    [self.diskCacheInfo setObject:[NSNumber numberWithUnsignedInteger:diskCacheUsage] forKey:kSDURLCacheInfoDiskUsageKey];
+
+
     // Update cache info for the stored item
     [(NSMutableDictionary *)[self.diskCacheInfo objectForKey:kSDURLCacheInfoAccessesKey] setObject:[NSDate date] forKey:cacheKey];
     [(NSMutableDictionary *)[self.diskCacheInfo objectForKey:kSDURLCacheInfoSizesKey] setObject:cacheItemSize forKey:cacheKey];
-    
+
     [self saveCacheInfo];
 }
 
@@ -287,7 +287,7 @@ static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
 
         // Init the operation queue
         self.ioQueue = [[[NSOperationQueue alloc] init] autorelease];
-        ioQueue.maxConcurrentOperationCount = 1; // used to streamline operations in a separate thread        
+        ioQueue.maxConcurrentOperationCount = 1; // used to streamline operations in a separate thread
     }
 
     return self;
@@ -318,7 +318,7 @@ static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
             return;
         }
 
-        [ioQueue addOperation:[[[NSInvocationOperation alloc] initWithTarget:self 
+        [ioQueue addOperation:[[[NSInvocationOperation alloc] initWithTarget:self
                                                                     selector:@selector(storeToDisk:)
                                                                       object:[NSDictionary dictionaryWithObjectsAndKeys:
                                                                               cachedResponse, @"cachedResponse",
@@ -382,11 +382,11 @@ static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
 - (void)dealloc
 {
     [periodicMaintenanceTimer invalidate];
-    [periodicMaintenanceTimer release];
-    [periodicMaintenanceOperation release];
-    [diskCachePath release];
-    [diskCacheInfo release];
-    [ioQueue release];
+    [periodicMaintenanceTimer release], periodicMaintenanceTimer = nil;
+    [periodicMaintenanceOperation release], periodicMaintenanceOperation = nil;
+    [diskCachePath release], diskCachePath = nil;
+    [diskCacheInfo release], diskCacheInfo = nil;
+    [ioQueue release], ioQueue = nil;
     [super dealloc];
 }
 
