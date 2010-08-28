@@ -108,10 +108,31 @@ static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
     NSString *expires = [headers objectForKey:@"Expires"];
     if (expires)
     {
+        // Parse HTTP Date: http://www.w3.org/Protocols/rfc2616/rfc2616-sec3.html#sec3.3.1
         NSDateFormatter *dateFormatter = [[NSDateFormatter alloc] init];
-        [dateFormatter setDateFormat:@"EEE, MMM d, yyyy, h:mm a"];
+        [dateFormatter setLocale:[[NSLocale alloc] initWithLocaleIdentifier:@"en_US"]];
+
+        // RFC 1123 date format - Sun, 06 Nov 1994 08:49:37 GMT
+        [dateFormatter setDateFormat:@"EEE, dd MMM yyyy HH:mm:ss z"];
         NSDate *expirationDate = [dateFormatter dateFromString:expires];
+        if (!expirationDate)
+        {
+            // ANSI C date format - Sun Nov  6 08:49:37 1994
+            [dateFormatter setDateFormat:@"EEE MMM d HH:mm:ss yyyy"];
+            expirationDate = [dateFormatter dateFromString:expires];
+            if (!expirationDate)
+            {
+                // RFC 850 date format - Sunday, 06-Nov-94 08:49:37 GMT
+                [dateFormatter setDateFormat:@"EEEE, dd-MMM-yy HH:mm:ss z"];
+                expirationDate = [dateFormatter dateFromString:expires];
+                if (!expirationDate)
+                {
+                    return nil;
+                }
+            }
+        }
         [dateFormatter release];
+
         if ([expirationDate timeIntervalSinceNow] < 0)
         {
             return nil;

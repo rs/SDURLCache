@@ -21,7 +21,7 @@
 			isa = PBXContainerItemProxy;
 			containerPortal = 0867D690FE84028FC02AAC07 /* Project object */;
 			proxyType = 1;
-			remoteGlobalIDString = D2AAC07D0554694100DB518D /* SDURLCache */;
+			remoteGlobalIDString = D2AAC07D0554694100DB518D;
 			remoteInfo = SDURLCache;
 		};
 /* End PBXContainerItemProxy section */
@@ -322,6 +322,7 @@
 				);
 				PREBINDING = NO;
 				PRODUCT_NAME = SDURLCacheTestBundle;
+				SDKROOT = iphoneos4.0;
 				WRAPPER_EXTENSION = octest;
 			};
 			name = Debug;
@@ -350,6 +351,7 @@
 				);
 				PREBINDING = NO;
 				PRODUCT_NAME = SDURLCacheTestBundle;
+				SDKROOT = iphoneos4.0;
 				WRAPPER_EXTENSION = octest;
 				ZERO_LINK = NO;
 			};

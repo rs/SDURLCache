@@ -18,21 +18,33 @@
 - (void)testExpirationDateFromHeader
 {
     NSDateFormatter *dateFormatter = [[NSDateFormatter alloc] init];
-    [dateFormatter setDateFormat:@"EEE, MMM d, yyyy, h:mm a"];
+    [dateFormatter setDateFormat:@"EEE, dd MMM yyyy HH:mm:ss z"];
     NSString *pastDate = [dateFormatter stringFromDate:[NSDate dateWithTimeIntervalSinceNow:-1000]];
     NSString *futureDate = [dateFormatter stringFromDate:[NSDate dateWithTimeIntervalSinceNow:1000]];
-    
+
     NSDate *expDate;
 
     // Pragma: no-cache
     expDate = [SDURLCache expirationDateFromHeaders:[NSDictionary dictionaryWithObjectsAndKeys:@"no-cache", @"Pragma", futureDate, @"Expires", nil]];
-    
     STAssertNil(expDate, @"Pragma no-cache");
-    
+
     // Expires in the past
     expDate = [SDURLCache expirationDateFromHeaders:[NSDictionary dictionaryWithObjectsAndKeys:pastDate, @"Expires", nil]];
-
     STAssertNil(expDate, @"Expires in the past");
+
+    // Expires in the past
+    expDate = [SDURLCache expirationDateFromHeaders:[NSDictionary dictionaryWithObjectsAndKeys:futureDate, @"Expires", nil]];
+    STAssertTrue([expDate timeIntervalSinceNow] > 0, @"Expires in the future");
+
+    // Expires format
+    expDate = [SDURLCache expirationDateFromHeaders:[NSDictionary dictionaryWithObjectsAndKeys:@"Invalid Date Format", @"Expires", nil]];
+    STAssertNil(expDate, @"Expires with invalid date format");
+    [dateFormatter setDateFormat:@"EEE MMM d HH:mm:ss yyyy"];
+    expDate = [SDURLCache expirationDateFromHeaders:[NSDictionary dictionaryWithObjectsAndKeys:[dateFormatter stringFromDate:[NSDate dateWithTimeIntervalSinceNow:1000]], @"Expires", nil]];
+    STAssertTrue([expDate timeIntervalSinceNow] > 0, @"Expires with ANSI C date format");
+    [dateFormatter setDateFormat:@"EEEE, dd-MMM-yy HH:mm:ss z"];
+    expDate = [SDURLCache expirationDateFromHeaders:[NSDictionary dictionaryWithObjectsAndKeys:[dateFormatter stringFromDate:[NSDate dateWithTimeIntervalSinceNow:1000]], @"Expires", nil]];
+    STAssertTrue([expDate timeIntervalSinceNow] > 0, @"Expires with RFC 850 date format");
 
     // Cache-Control: no-cache with Expires in the future
     expDate = [SDURLCache expirationDateFromHeaders:[NSDictionary dictionaryWithObjectsAndKeys:@"no-cache", @"Cache-Control", futureDate, @"Expires", nil]];
