@@ -14,7 +14,7 @@ static NSString *const kSDURLCacheInfoFileName = @"cacheInfo.plist";
 static NSString *const kSDURLCacheInfoDiskUsageKey = @"diskUsage";
 static NSString *const kSDURLCacheInfoAccessesKey = @"accesses";
 static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
-static float const kSDURLCacheLastModFraction = 0.1; // 10% since Last-Modified suggested by RFC2616 section 13.2.4
+static float const kSDURLCacheLastModFraction = 0.1f; // 10% since Last-Modified suggested by RFC2616 section 13.2.4
 static float const kSDURLCacheDefault = 3600; // Default cache expiration delay if none defined (1 hour)
 
 @implementation NSCachedURLResponse(NSCoder)
@@ -70,7 +70,7 @@ static float const kSDURLCacheDefault = 3600; // Default cache expiration delay 
     NSDate *date = nil;
 
     NSDateFormatter *dateFormatter = [[NSDateFormatter alloc] init];
-    [dateFormatter setLocale:[[NSLocale alloc] initWithLocaleIdentifier:@"en_US"]];
+    [dateFormatter setLocale:[[[NSLocale alloc] initWithLocaleIdentifier:@"en_US"] autorelease]];
     [dateFormatter setTimeZone:[NSTimeZone timeZoneWithAbbreviation:@"GMT"]];
 
     // RFC 1123 date format - Sun, 06 Nov 1994 08:49:37 GMT
