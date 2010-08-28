@@ -10,10 +10,29 @@
 #import "SDURLCache.h"
 
 @interface SDURLCache ()
++ (NSDate *)dateFromHttpDateString:(NSString *)httpDate;
 + (NSDate *)expirationDateFromHeaders:(NSDictionary *)headers;
 @end
 
 @implementation SDURLCacheTests
+
+- (void)testHttpDateParser
+{
+    NSDate *date;
+    NSTimeInterval referenceTime = 784111777;
+
+    // RFC 1123 date format
+    date = [SDURLCache dateFromHttpDateString:@"Sun, 06 Nov 1994 08:49:37 GMT"];
+    STAssertEquals([date timeIntervalSince1970], referenceTime, @"RFC 1123 date format");
+
+    // ANSI C date format
+    date = [SDURLCache dateFromHttpDateString:@"Sun Nov  6 08:49:37 1994"];
+    STAssertEquals([date timeIntervalSince1970], referenceTime, @"ANSI C date format %f", [date timeIntervalSince1970]);
+
+    // RFC 850 date format
+    date = [SDURLCache dateFromHttpDateString:@"Sunday, 06-Nov-94 08:49:37 GMT"];
+    STAssertEquals([date timeIntervalSince1970], referenceTime, @"RFC 850 date format");
+}
 
 - (void)testExpirationDateFromHeader
 {
@@ -35,16 +54,6 @@
     // Expires in the past
     expDate = [SDURLCache expirationDateFromHeaders:[NSDictionary dictionaryWithObjectsAndKeys:futureDate, @"Expires", nil]];
     STAssertTrue([expDate timeIntervalSinceNow] > 0, @"Expires in the future");
-
-    // Expires format
-    expDate = [SDURLCache expirationDateFromHeaders:[NSDictionary dictionaryWithObjectsAndKeys:@"Invalid Date Format", @"Expires", nil]];
-    STAssertNil(expDate, @"Expires with invalid date format");
-    [dateFormatter setDateFormat:@"EEE MMM d HH:mm:ss yyyy"];
-    expDate = [SDURLCache expirationDateFromHeaders:[NSDictionary dictionaryWithObjectsAndKeys:[dateFormatter stringFromDate:[NSDate dateWithTimeIntervalSinceNow:1000]], @"Expires", nil]];
-    STAssertTrue([expDate timeIntervalSinceNow] > 0, @"Expires with ANSI C date format");
-    [dateFormatter setDateFormat:@"EEEE, dd-MMM-yy HH:mm:ss z"];
-    expDate = [SDURLCache expirationDateFromHeaders:[NSDictionary dictionaryWithObjectsAndKeys:[dateFormatter stringFromDate:[NSDate dateWithTimeIntervalSinceNow:1000]], @"Expires", nil]];
-    STAssertTrue([expDate timeIntervalSinceNow] > 0, @"Expires with RFC 850 date format");
 
     // Cache-Control: no-cache with Expires in the future
     expDate = [SDURLCache expirationDateFromHeaders:[NSDictionary dictionaryWithObjectsAndKeys:@"no-cache", @"Cache-Control", futureDate, @"Expires", nil]];

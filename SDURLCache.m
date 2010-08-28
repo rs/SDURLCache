@@ -61,6 +61,38 @@ static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
 }
 
 /*
+ * Parse HTTP Date: http://www.w3.org/Protocols/rfc2616/rfc2616-sec3.html#sec3.3.1
+ */
++ (NSDate *)dateFromHttpDateString:(NSString *)httpDate
+{
+    NSDate *date = nil;
+
+    NSDateFormatter *dateFormatter = [[NSDateFormatter alloc] init];
+    [dateFormatter setLocale:[[NSLocale alloc] initWithLocaleIdentifier:@"en_US"]];
+    [dateFormatter setTimeZone:[NSTimeZone timeZoneWithAbbreviation:@"GMT"]];
+
+    // RFC 1123 date format - Sun, 06 Nov 1994 08:49:37 GMT
+    [dateFormatter setDateFormat:@"EEE, dd MMM yyyy HH:mm:ss z"];
+    date = [dateFormatter dateFromString:httpDate];
+    if (!date)
+    {
+        // ANSI C date format - Sun Nov  6 08:49:37 1994
+        [dateFormatter setDateFormat:@"EEE MMM d HH:mm:ss yyyy"];
+        date = [dateFormatter dateFromString:httpDate];
+        if (!date)
+        {
+            // RFC 850 date format - Sunday, 06-Nov-94 08:49:37 GMT
+            [dateFormatter setDateFormat:@"EEEE, dd-MMM-yy HH:mm:ss z"];
+            date = [dateFormatter dateFromString:httpDate];
+        }
+    }
+
+    [dateFormatter release];
+
+    return date;
+}
+
+/*
  * This method tries to determine the expiration date based on a response headers dictionary.
  */
 + (NSDate *)expirationDateFromHeaders:(NSDictionary *)headers
@@ -71,6 +103,19 @@ static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
     {
         // Uncacheable response
         return nil;
+    }
+
+    // Define "now" based on the request
+    NSString *date = [headers objectForKey:@"Date"];
+    NSDate *now;
+    if (date)
+    {
+        now = [SDURLCache dateFromHttpDateString:date];
+    }
+    else
+    {
+        // If no Date: header, define now from local clock
+        now = [NSDate date];
     }
 
     // Look at info from the Cache-Control: max-age=n header
@@ -108,33 +153,20 @@ static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
     NSString *expires = [headers objectForKey:@"Expires"];
     if (expires)
     {
-        // Parse HTTP Date: http://www.w3.org/Protocols/rfc2616/rfc2616-sec3.html#sec3.3.1
-        NSDateFormatter *dateFormatter = [[NSDateFormatter alloc] init];
-        [dateFormatter setLocale:[[NSLocale alloc] initWithLocaleIdentifier:@"en_US"]];
-
-        // RFC 1123 date format - Sun, 06 Nov 1994 08:49:37 GMT
-        [dateFormatter setDateFormat:@"EEE, dd MMM yyyy HH:mm:ss z"];
-        NSDate *expirationDate = [dateFormatter dateFromString:expires];
-        if (!expirationDate)
+        NSTimeInterval expirationInterval = 0;
+        NSDate *expirationDate = [SDURLCache dateFromHttpDateString:expires];
+        if (expirationDate)
         {
-            // ANSI C date format - Sun Nov  6 08:49:37 1994
-            [dateFormatter setDateFormat:@"EEE MMM d HH:mm:ss yyyy"];
-            expirationDate = [dateFormatter dateFromString:expires];
-            if (!expirationDate)
-            {
-                // RFC 850 date format - Sunday, 06-Nov-94 08:49:37 GMT
-                [dateFormatter setDateFormat:@"EEEE, dd-MMM-yy HH:mm:ss z"];
-                expirationDate = [dateFormatter dateFromString:expires];
-                if (!expirationDate)
-                {
-                    return nil;
-                }
-            }
+            expirationInterval = [expirationDate timeIntervalSinceDate:now];
         }
-        [dateFormatter release];
-
-        if ([expirationDate timeIntervalSinceNow] < 0)
+        if (expirationInterval > 0)
         {
+            // Convert remote expiration date to local expiration date
+            return [NSDate dateWithTimeIntervalSinceNow:expirationInterval];
+        }
+        else
+        {
+            // If the Expires header can't be parsed or is expired, do not cache
             return nil;
         }
         else
