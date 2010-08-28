@@ -14,6 +14,8 @@ static NSString *const kSDURLCacheInfoFileName = @"cacheInfo.plist";
 static NSString *const kSDURLCacheInfoDiskUsageKey = @"diskUsage";
 static NSString *const kSDURLCacheInfoAccessesKey = @"accesses";
 static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
+static float const kSDURLCacheLastModFraction = 0.1; // 10% since Last-Modified suggested by RFC2616 section 13.2.4
+static float const kSDURLCacheDefault = 3600; // Default cache expiration delay if none defined (1 hour)
 
 @implementation NSCachedURLResponse(NSCoder)
 
@@ -169,13 +171,31 @@ static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
             // If the Expires header can't be parsed or is expired, do not cache
             return nil;
         }
+    }
+
+    // If no cache control defined, try some heristic to determine an expiration date
+    NSString *lastModified = [headers objectForKey:@"Last-Modified"];
+    if (lastModified)
+    {
+        NSTimeInterval age = 0;
+        NSDate *lastModifiedDate = [SDURLCache dateFromHttpDateString:lastModified];
+        if (lastModifiedDate)
+        {
+            // Define the age of the document by comparing the Date header with the Last-Modified header
+            age = [now timeIntervalSinceDate:lastModifiedDate];
+        }
+        if (age > 0)
+        {
+            return [NSDate dateWithTimeIntervalSinceNow:(age * kSDURLCacheLastModFraction)];
+        }
         else
         {
-            return expirationDate;
+            return nil;
         }
     }
 
-    return nil;
+    // If nothing permitted to define the cache expiration delay nor to restrict its cacheability, use a default cache expiration delay
+    return [NSDate dateWithTimeInterval:kSDURLCacheDefault sinceDate:now];
 }
 
 #pragma mark SDURLCache (private)

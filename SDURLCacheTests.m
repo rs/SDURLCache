@@ -38,10 +38,22 @@
 {
     NSDateFormatter *dateFormatter = [[NSDateFormatter alloc] init];
     [dateFormatter setDateFormat:@"EEE, dd MMM yyyy HH:mm:ss z"];
-    NSString *pastDate = [dateFormatter stringFromDate:[NSDate dateWithTimeIntervalSinceNow:-1000]];
-    NSString *futureDate = [dateFormatter stringFromDate:[NSDate dateWithTimeIntervalSinceNow:1000]];
+    NSDate *now = [NSDate date];
+    NSString *pastDate = [dateFormatter stringFromDate:[NSDate dateWithTimeInterval:-1000 sinceDate:now]];
+    NSString *nowDate = [dateFormatter stringFromDate:now];
+    NSString *futureDate = [dateFormatter stringFromDate:[NSDate dateWithTimeInterval:1000 sinceDate:now]];
 
     NSDate *expDate;
+
+    // No cache control
+    expDate = [SDURLCache expirationDateFromHeaders:[NSDictionary dictionaryWithObjectsAndKeys:nowDate, @"Date", nil]];
+    STAssertNotNil(expDate, @"No cache control returns a default expiration date");
+    STAssertEqualsWithAccuracy([expDate timeIntervalSinceNow], (NSTimeInterval)3600, 1, @"Default expiration date is 1 hour");
+
+    // No cache control but last-modified
+    expDate = [SDURLCache expirationDateFromHeaders:[NSDictionary dictionaryWithObjectsAndKeys:pastDate, @"Last-Modified", nowDate, @"Date", nil]];
+    STAssertNotNil(expDate, @"No cache control with last-modified header returns an expiration date");
+    STAssertEqualsWithAccuracy([expDate timeIntervalSinceNow], (NSTimeInterval)100, 1, @"Expiration date relative to last-modified is 10%% of the age");
 
     // Pragma: no-cache
     expDate = [SDURLCache expirationDateFromHeaders:[NSDictionary dictionaryWithObjectsAndKeys:@"no-cache", @"Pragma", futureDate, @"Expires", nil]];
