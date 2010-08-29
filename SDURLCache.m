@@ -97,8 +97,14 @@ static float const kSDURLCacheDefault = 3600; // Default cache expiration delay 
 /*
  * This method tries to determine the expiration date based on a response headers dictionary.
  */
-+ (NSDate *)expirationDateFromHeaders:(NSDictionary *)headers
++ (NSDate *)expirationDateFromHeaders:(NSDictionary *)headers withStatusCode:(NSInteger)status
 {
+    if (status != 200 && status != 203 && status != 300 && status != 301 && status != 302 && status != 307 && status != 410)
+    {
+        // Uncacheable response status code
+        return nil;
+    }
+
     // Check Pragma: no-cache
     NSString *pragma = [headers objectForKey:@"Pragma"];
     if (pragma && [pragma isEqualToString:@"no-cache"])
@@ -171,6 +177,12 @@ static float const kSDURLCacheDefault = 3600; // Default cache expiration delay 
             // If the Expires header can't be parsed or is expired, do not cache
             return nil;
         }
+    }
+
+    if (status == 302 || status == 307)
+    {
+        // If not explict cache control defined, do not cache those status
+        return nil;
     }
 
     // If no cache control defined, try some heristic to determine an expiration date
@@ -414,7 +426,8 @@ static float const kSDURLCacheDefault = 3600; // Default cache expiration delay 
         && [cachedResponse.response isKindOfClass:[NSHTTPURLResponse self]]
         && cachedResponse.data.length < self.diskCapacity)
     {
-        NSDate *expirationDate = [SDURLCache expirationDateFromHeaders:[(NSHTTPURLResponse *)cachedResponse.response allHeaderFields]];
+        NSDate *expirationDate = [SDURLCache expirationDateFromHeaders:[(NSHTTPURLResponse *)cachedResponse.response allHeaderFields]
+                                                        withStatusCode:((NSHTTPURLResponse *)cachedResponse.response).statusCode];
         if (!expirationDate || [expirationDate timeIntervalSinceNow] - minCacheInterval <= 0)
         {
             // This response is not cacheable, headers said
