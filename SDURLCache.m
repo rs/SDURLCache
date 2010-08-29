@@ -204,22 +204,28 @@ static float const kSDURLCacheDefault = 3600; // Default cache expiration delay 
 {
     if (!diskCacheInfo)
     {
-        diskCacheInfo = [[NSMutableDictionary alloc] initWithContentsOfFile:[diskCachePath stringByAppendingPathComponent:kSDURLCacheInfoFileName]];
-        if (!diskCacheInfo)
+        @synchronized(self)
         {
-            diskCacheInfo = [[NSMutableDictionary alloc] initWithObjectsAndKeys:
-                             [NSNumber numberWithUnsignedInt:0], kSDURLCacheInfoDiskUsageKey,
-                             [NSMutableDictionary dictionary], kSDURLCacheInfoAccessesKey,
-                             [NSMutableDictionary dictionary], kSDURLCacheInfoSizesKey,
-                             nil];
-        }
-        diskCacheInfoDirty = NO;
+            if (!diskCacheInfo) // Check again, maybe another thread created it while waiting for the mutex
+            {
+                diskCacheInfo = [[NSMutableDictionary alloc] initWithContentsOfFile:[diskCachePath stringByAppendingPathComponent:kSDURLCacheInfoFileName]];
+                if (!diskCacheInfo)
+                {
+                    diskCacheInfo = [[NSMutableDictionary alloc] initWithObjectsAndKeys:
+                                     [NSNumber numberWithUnsignedInt:0], kSDURLCacheInfoDiskUsageKey,
+                                     [NSMutableDictionary dictionary], kSDURLCacheInfoAccessesKey,
+                                     [NSMutableDictionary dictionary], kSDURLCacheInfoSizesKey,
+                                     nil];
+                }
+                diskCacheInfoDirty = NO;
 
-        periodicMaintenanceTimer = [[NSTimer scheduledTimerWithTimeInterval:5
-                                                                     target:self
-                                                                   selector:@selector(periodicMaintenance)
-                                                                   userInfo:nil
-                                                                    repeats:YES] retain];
+                periodicMaintenanceTimer = [[NSTimer scheduledTimerWithTimeInterval:5
+                                                                             target:self
+                                                                           selector:@selector(periodicMaintenance)
+                                                                           userInfo:nil
+                                                                            repeats:YES] retain];
+            }
+        }
     }
 
     return diskCacheInfo;
@@ -227,20 +233,25 @@ static float const kSDURLCacheDefault = 3600; // Default cache expiration delay 
 
 - (void)createDiskCachePath
 {
-    if (![[NSFileManager defaultManager] fileExistsAtPath:diskCachePath])
+    NSFileManager *fileManager = [[NSFileManager alloc] init];
+    if (![fileManager fileExistsAtPath:diskCachePath])
     {
-        [[NSFileManager defaultManager] createDirectoryAtPath:diskCachePath
-                                  withIntermediateDirectories:YES
-                                                   attributes:nil
-                                                        error:NULL];
+        [fileManager createDirectoryAtPath:diskCachePath
+               withIntermediateDirectories:YES
+                                attributes:nil
+                                     error:NULL];
     }
+    [fileManager release];
 }
 
 - (void)saveCacheInfo
 {
     [self createDiskCachePath];
-    [self.diskCacheInfo writeToFile:[diskCachePath stringByAppendingPathComponent:kSDURLCacheInfoFileName] atomically:YES];
-    diskCacheInfoDirty = NO;
+    @synchronized(self.diskCacheInfo)
+    {
+        [self.diskCacheInfo writeToFile:[diskCachePath stringByAppendingPathComponent:kSDURLCacheInfoFileName] atomically:YES];
+        diskCacheInfoDirty = NO;
+    }
 }
 
 - (void)removeCachedResponseForCachedKeys:(NSArray *)cacheKeys
@@ -250,17 +261,24 @@ static float const kSDURLCacheDefault = 3600; // Default cache expiration delay 
     NSEnumerator *enumerator = [cacheKeys objectEnumerator];
     NSString *cacheKey;
 
-    NSMutableDictionary *accesses = [self.diskCacheInfo objectForKey:kSDURLCacheInfoAccessesKey];
-    NSMutableDictionary *sizes = [self.diskCacheInfo objectForKey:kSDURLCacheInfoSizesKey];
-
-    while ((cacheKey = [enumerator nextObject]))
+    @synchronized(self.diskCacheInfo)
     {
-        NSUInteger cacheItemSize = [[sizes objectForKey:cacheKey] unsignedIntegerValue];
-        [accesses removeObjectForKey:cacheKey];
-        [sizes removeObjectForKey:cacheKey];
-        [[NSFileManager defaultManager] removeItemAtPath:[diskCachePath stringByAppendingPathComponent:cacheKey] error:NULL];
-        diskCacheUsage -= cacheItemSize;
-        [self.diskCacheInfo setObject:[NSNumber numberWithUnsignedInteger:diskCacheUsage] forKey:kSDURLCacheInfoDiskUsageKey];
+        NSMutableDictionary *accesses = [self.diskCacheInfo objectForKey:kSDURLCacheInfoAccessesKey];
+        NSMutableDictionary *sizes = [self.diskCacheInfo objectForKey:kSDURLCacheInfoSizesKey];
+        NSFileManager *fileManager = [[[NSFileManager alloc] init] autorelease];
+
+        while ((cacheKey = [enumerator nextObject]))
+        {
+            NSUInteger cacheItemSize = [[sizes objectForKey:cacheKey] unsignedIntegerValue];
+            [accesses removeObjectForKey:cacheKey];
+            [sizes removeObjectForKey:cacheKey];
+            [fileManager removeItemAtPath:[diskCachePath stringByAppendingPathComponent:cacheKey] error:NULL];
+            diskCacheUsage -= cacheItemSize;
+            @synchronized(self.diskCacheInfo)
+            {
+                [self.diskCacheInfo setObject:[NSNumber numberWithUnsignedInteger:diskCacheUsage] forKey:kSDURLCacheInfoDiskUsageKey];
+            }
+        }
     }
 
     [pool drain];
@@ -274,19 +292,23 @@ static float const kSDURLCacheDefault = 3600; // Default cache expiration delay 
         return;
     }
 
-    // Apply LRU cache eviction algorithm while disk usage outreach capacity
-    NSDictionary *sizes = [self.diskCacheInfo objectForKey:kSDURLCacheInfoSizesKey];
     NSMutableArray *keysToRemove = [NSMutableArray array];
 
-    NSInteger capacityToSave = diskCacheUsage - self.diskCapacity;
-    NSArray *sortedKeys = [(NSDictionary *)[self.diskCacheInfo objectForKey:kSDURLCacheInfoAccessesKey] keysSortedByValueUsingSelector:@selector(compare:)];
-    NSEnumerator *enumerator = [sortedKeys objectEnumerator];
-    NSString *cacheKey;
-
-    while (capacityToSave > 0 && (cacheKey = [enumerator nextObject]))
+    @synchronized(self.diskCacheInfo)
     {
-        [keysToRemove addObject:cacheKey];
-        capacityToSave -= [(NSNumber *)[sizes objectForKey:cacheKey] unsignedIntegerValue];
+        // Apply LRU cache eviction algorithm while disk usage outreach capacity
+        NSDictionary *sizes = [self.diskCacheInfo objectForKey:kSDURLCacheInfoSizesKey];
+
+        NSInteger capacityToSave = diskCacheUsage - self.diskCapacity;
+        NSArray *sortedKeys = [[self.diskCacheInfo objectForKey:kSDURLCacheInfoAccessesKey] keysSortedByValueUsingSelector:@selector(compare:)];
+        NSEnumerator *enumerator = [sortedKeys objectEnumerator];
+        NSString *cacheKey;
+
+        while (capacityToSave > 0 && (cacheKey = [enumerator nextObject]))
+        {
+            [keysToRemove addObject:cacheKey];
+            capacityToSave -= [(NSNumber *)[sizes objectForKey:cacheKey] unsignedIntegerValue];
+        }
     }
 
     [self removeCachedResponseForCachedKeys:keysToRemove];
@@ -312,14 +334,19 @@ static float const kSDURLCacheDefault = 3600; // Default cache expiration delay 
     }
 
     // Update disk usage info
-    NSNumber *cacheItemSize = [[[NSFileManager defaultManager] attributesOfItemAtPath:cacheFilePath error:NULL] objectForKey:NSFileSize];
+    NSFileManager *fileManager = [[NSFileManager alloc] init];
+    NSNumber *cacheItemSize = [[fileManager attributesOfItemAtPath:cacheFilePath error:NULL] objectForKey:NSFileSize];
+    [fileManager release];
     diskCacheUsage += [cacheItemSize unsignedIntegerValue];
-    [self.diskCacheInfo setObject:[NSNumber numberWithUnsignedInteger:diskCacheUsage] forKey:kSDURLCacheInfoDiskUsageKey];
+    @synchronized(self.diskCacheInfo)
+    {
+        [self.diskCacheInfo setObject:[NSNumber numberWithUnsignedInteger:diskCacheUsage] forKey:kSDURLCacheInfoDiskUsageKey];
 
 
-    // Update cache info for the stored item
-    [(NSMutableDictionary *)[self.diskCacheInfo objectForKey:kSDURLCacheInfoAccessesKey] setObject:[NSDate date] forKey:cacheKey];
-    [(NSMutableDictionary *)[self.diskCacheInfo objectForKey:kSDURLCacheInfoSizesKey] setObject:cacheItemSize forKey:cacheKey];
+        // Update cache info for the stored item
+        [(NSMutableDictionary *)[self.diskCacheInfo objectForKey:kSDURLCacheInfoAccessesKey] setObject:[NSDate date] forKey:cacheKey];
+        [(NSMutableDictionary *)[self.diskCacheInfo objectForKey:kSDURLCacheInfoSizesKey] setObject:cacheItemSize forKey:cacheKey];
+    }
 
     [self saveCacheInfo];
 }
@@ -416,20 +443,23 @@ static float const kSDURLCacheDefault = 3600; // Default cache expiration delay 
 
     // NOTE: We don't handle expiration here as even staled cache data is necessary for NSURLConnection to handle cache revalidation.
     //       Staled cache data is also needed for cachePolicies which force the use of the cache.
-    NSMutableDictionary *accesses = [self.diskCacheInfo objectForKey:kSDURLCacheInfoAccessesKey];
-    if ([accesses objectForKey:cacheKey]) // OPTI: Check for cache-hit in a in-memory dictionnary before to hit the FS
+    @synchronized(self.diskCacheInfo)
     {
-        NSCachedURLResponse *diskResponse = [NSKeyedUnarchiver unarchiveObjectWithFile:[diskCachePath stringByAppendingPathComponent:cacheKey]];
-        if (diskResponse)
+        NSMutableDictionary *accesses = [self.diskCacheInfo objectForKey:kSDURLCacheInfoAccessesKey];
+        if ([accesses objectForKey:cacheKey]) // OPTI: Check for cache-hit in a in-memory dictionnary before to hit the FS
         {
-            // OPTI: Log the entry last access time for LRU cache eviction algorithm but don't save the dictionary
-            //       on disk now in order to save IO and time
-            [accesses setObject:[NSDate date] forKey:cacheKey];
-            diskCacheInfoDirty = YES;
+            NSCachedURLResponse *diskResponse = [NSKeyedUnarchiver unarchiveObjectWithFile:[diskCachePath stringByAppendingPathComponent:cacheKey]];
+            if (diskResponse)
+            {
+                // OPTI: Log the entry last access time for LRU cache eviction algorithm but don't save the dictionary
+                //       on disk now in order to save IO and time
+                [accesses setObject:[NSDate date] forKey:cacheKey];
+                diskCacheInfoDirty = YES;
 
-            // OPTI: Store the response to memory cache for potential future requests
-            [super storeCachedResponse:diskResponse forRequest:request];
-            return diskResponse;
+                // OPTI: Store the response to memory cache for potential future requests
+                [super storeCachedResponse:diskResponse forRequest:request];
+                return diskResponse;
+            }
         }
     }
 
