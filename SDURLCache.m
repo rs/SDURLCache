@@ -207,7 +207,8 @@ static float const kSDURLCacheDefault = 3600; // Default cache expiration delay 
     }
 
     // If nothing permitted to define the cache expiration delay nor to restrict its cacheability, use a default cache expiration delay
-    return [NSDate dateWithTimeInterval:kSDURLCacheDefault sinceDate:now];
+    return [[[NSDate alloc] initWithTimeInterval:kSDURLCacheDefault sinceDate:now] autorelease];
+
 }
 
 #pragma mark SDURLCache (private)
