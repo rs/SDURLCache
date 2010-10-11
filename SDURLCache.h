@@ -35,4 +35,14 @@
  */
 + (NSString *)defaultCachePath;
 
+/*
+ * Checks if the provided URL exists in cache.
+ */
+- (BOOL)isCached:(NSURL *)url;
+
+/*
+ * Removes the cache contents.
+ */
+- (BOOL)clearCache;
+
 @end

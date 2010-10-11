@@ -503,6 +503,28 @@ static NSDateFormatter* CreateDateFormatter(NSString *format)
     [super removeAllCachedResponses];
 }
 
+- (BOOL)clearCache
+{
+    NSFileManager *fileManager = [[[NSFileManager alloc] init] autorelease];
+    return [fileManager removeItemAtPath:diskCachePath error:NULL];
+}
+
+- (BOOL)isCached:(NSURL *)url
+{
+    NSURLRequest *request = [NSURLRequest requestWithURL:url];
+    if ([super cachedResponseForRequest:request])
+    {
+        return YES;
+    }
+    NSString *cacheKey = [SDURLCache cacheKeyForURL:url];
+    NSString *cacheFile = [diskCachePath stringByAppendingPathComponent:cacheKey];
+    if ([[[[NSFileManager alloc] init] autorelease] fileExistsAtPath:cacheFile])
+    {
+        return YES;
+    }
+    return NO;
+}
+
 #pragma mark NSObject
 
 - (void)dealloc
