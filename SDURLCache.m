@@ -57,7 +57,7 @@ static NSDateFormatter* CreateDateFormatter(NSString *format)
 
 @implementation SDURLCache
 
-@synthesize diskCachePath, minCacheInterval, ioQueue, periodicMaintenanceOperation;
+@synthesize diskCachePath, minCacheInterval, ioQueue, periodicMaintenanceOperation, ignoreMemoryOnlyStoragePolicy;
 @dynamic diskCacheInfo;
 
 #pragma mark SDURLCache (tools)
@@ -410,7 +410,9 @@ static NSDateFormatter* CreateDateFormatter(NSString *format)
         // Init the operation queue
         self.ioQueue = [[[NSOperationQueue alloc] init] autorelease];
         ioQueue.maxConcurrentOperationCount = 1; // used to streamline operations in a separate thread
-    }
+
+        self.ignoreMemoryOnlyStoragePolicy = YES;
+	}
 
     return self;
 }
@@ -429,7 +431,8 @@ static NSDateFormatter* CreateDateFormatter(NSString *format)
 
     [super storeCachedResponse:cachedResponse forRequest:request];
 
-    if (cachedResponse.storagePolicy == NSURLCacheStorageAllowed
+    NSURLCacheStoragePolicy storagePolicy = cachedResponse.storagePolicy;
+    if ((storagePolicy == NSURLCacheStorageAllowed || (storagePolicy == NSURLCacheStorageAllowedInMemoryOnly && ignoreMemoryOnlyStoragePolicy))
         && [cachedResponse.response isKindOfClass:[NSHTTPURLResponse self]]
         && cachedResponse.data.length < self.diskCapacity)
     {
