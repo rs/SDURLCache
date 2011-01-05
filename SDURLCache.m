@@ -433,12 +433,17 @@ static NSDateFormatter* CreateDateFormatter(NSString *format)
         && [cachedResponse.response isKindOfClass:[NSHTTPURLResponse self]]
         && cachedResponse.data.length < self.diskCapacity)
     {
-        NSDate *expirationDate = [SDURLCache expirationDateFromHeaders:[(NSHTTPURLResponse *)cachedResponse.response allHeaderFields]
-                                                        withStatusCode:((NSHTTPURLResponse *)cachedResponse.response).statusCode];
-        if (!expirationDate || [expirationDate timeIntervalSinceNow] - minCacheInterval <= 0)
+        NSDictionary *headers = [(NSHTTPURLResponse *)cachedResponse.response allHeaderFields];
+        // RFC 2616 section 13.3.4 says clients MUST use Etag in any cache-conditional request if provided by server
+        if (![headers objectForKey:@"Etag"])
         {
-            // This response is not cacheable, headers said
-            return;
+            NSDate *expirationDate = [SDURLCache expirationDateFromHeaders:headers
+                                                            withStatusCode:((NSHTTPURLResponse *)cachedResponse.response).statusCode];
+            if (!expirationDate || [expirationDate timeIntervalSinceNow] - minCacheInterval <= 0)
+            {
+                // This response is not cacheable, headers said
+                return;
+            }
         }
 
         [ioQueue addOperation:[[[NSInvocationOperation alloc] initWithTarget:self
@@ -446,7 +451,6 @@ static NSDateFormatter* CreateDateFormatter(NSString *format)
                                                                       object:[NSDictionary dictionaryWithObjectsAndKeys:
                                                                               cachedResponse, @"cachedResponse",
                                                                               request, @"request",
-                                                                              expirationDate, @"expirationDate",
                                                                               nil]] autorelease]];
     }
 }
