@@ -17,6 +17,15 @@ static NSString *const kSDURLCacheInfoSizesKey = @"sizes";
 static float const kSDURLCacheLastModFraction = 0.1f; // 10% since Last-Modified suggested by RFC2616 section 13.2.4
 static float const kSDURLCacheDefault = 3600; // Default cache expiration delay if none defined (1 hour)
 
+static NSDateFormatter* CreateDateFormatter(NSString *format)
+{
+    NSDateFormatter *dateFormatter = [[NSDateFormatter alloc] init];
+    [dateFormatter setLocale:[[[NSLocale alloc] initWithLocaleIdentifier:@"en_US"] autorelease]];
+    [dateFormatter setTimeZone:[NSTimeZone timeZoneWithAbbreviation:@"GMT"]];
+    [dateFormatter setDateFormat:format];
+    return [dateFormatter autorelease];
+}
+
 @implementation NSCachedURLResponse(NSCoder)
 
 - (void)encodeWithCoder:(NSCoder *)coder
@@ -67,29 +76,26 @@ static float const kSDURLCacheDefault = 3600; // Default cache expiration delay 
  */
 + (NSDate *)dateFromHttpDateString:(NSString *)httpDate
 {
+    static NSDateFormatter *RFC1123DateFormatter;
+    static NSDateFormatter *ANSICDateFormatter;
+    static NSDateFormatter *RFC850DateFormatter;
     NSDate *date = nil;
 
-    NSDateFormatter *dateFormatter = [[NSDateFormatter alloc] init];
-    [dateFormatter setLocale:[[[NSLocale alloc] initWithLocaleIdentifier:@"en_US"] autorelease]];
-    [dateFormatter setTimeZone:[NSTimeZone timeZoneWithAbbreviation:@"GMT"]];
-
     // RFC 1123 date format - Sun, 06 Nov 1994 08:49:37 GMT
-    [dateFormatter setDateFormat:@"EEE, dd MMM yyyy HH:mm:ss z"];
-    date = [dateFormatter dateFromString:httpDate];
+    if (!RFC1123DateFormatter) RFC1123DateFormatter = [CreateDateFormatter(@"EEE, dd MMM yyyy HH:mm:ss z") retain];
+    date = [RFC1123DateFormatter dateFromString:httpDate];
     if (!date)
     {
         // ANSI C date format - Sun Nov  6 08:49:37 1994
-        [dateFormatter setDateFormat:@"EEE MMM d HH:mm:ss yyyy"];
-        date = [dateFormatter dateFromString:httpDate];
+        if (!ANSICDateFormatter) ANSICDateFormatter = [CreateDateFormatter(@"EEE MMM d HH:mm:ss yyyy") retain];
+        date = [ANSICDateFormatter dateFromString:httpDate];
         if (!date)
         {
             // RFC 850 date format - Sunday, 06-Nov-94 08:49:37 GMT
-            [dateFormatter setDateFormat:@"EEEE, dd-MMM-yy HH:mm:ss z"];
-            date = [dateFormatter dateFromString:httpDate];
+            if (!RFC850DateFormatter) RFC850DateFormatter = [CreateDateFormatter(@"EEEE, dd-MMM-yy HH:mm:ss z") retain];
+            date = [RFC850DateFormatter dateFromString:httpDate];
         }
     }
-
-    [dateFormatter release];
 
     return date;
 }
