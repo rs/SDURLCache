@@ -320,11 +320,9 @@ static NSDateFormatter* CreateDateFormatter(NSString *format)
             [accesses removeObjectForKey:cacheKey];
             [sizes removeObjectForKey:cacheKey];
             [fileManager removeItemAtPath:[diskCachePath stringByAppendingPathComponent:cacheKey] error:NULL];
+
             diskCacheUsage -= cacheItemSize;
-            @synchronized(self.diskCacheInfo)
-            {
-                [self.diskCacheInfo setObject:[NSNumber numberWithUnsignedInteger:diskCacheUsage] forKey:kSDURLCacheInfoDiskUsageKey];
-            }
+            [self.diskCacheInfo setObject:[NSNumber numberWithUnsignedInteger:diskCacheUsage] forKey:kSDURLCacheInfoDiskUsageKey];
         }
     }
 
@@ -384,9 +382,9 @@ static NSDateFormatter* CreateDateFormatter(NSString *format)
     NSFileManager *fileManager = [[NSFileManager alloc] init];
     NSNumber *cacheItemSize = [[fileManager attributesOfItemAtPath:cacheFilePath error:NULL] objectForKey:NSFileSize];
     [fileManager release];
-    diskCacheUsage += [cacheItemSize unsignedIntegerValue];
     @synchronized(self.diskCacheInfo)
     {
+        diskCacheUsage += [cacheItemSize unsignedIntegerValue];
         [self.diskCacheInfo setObject:[NSNumber numberWithUnsignedInteger:diskCacheUsage] forKey:kSDURLCacheInfoDiskUsageKey];
 
 
