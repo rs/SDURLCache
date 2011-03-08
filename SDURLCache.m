@@ -290,7 +290,12 @@ static NSDateFormatter* CreateDateFormatter(NSString *format)
     [self createDiskCachePath];
     @synchronized(self.diskCacheInfo)
     {
-        [self.diskCacheInfo writeToFile:[diskCachePath stringByAppendingPathComponent:kSDURLCacheInfoFileName] atomically:YES];
+        NSData *data = [NSPropertyListSerialization dataFromPropertyList:self.diskCacheInfo format:NSPropertyListBinaryFormat_v1_0 errorDescription:NULL];
+        if (data)
+        {
+            [data writeToFile:[diskCachePath stringByAppendingPathComponent:kSDURLCacheInfoFileName] atomically:YES];
+        }
+
         diskCacheInfoDirty = NO;
     }
 }
