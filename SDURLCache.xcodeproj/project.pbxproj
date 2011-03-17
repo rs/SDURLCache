@@ -253,6 +253,7 @@
 				GCC_PREFIX_HEADER = SDURLCache_Prefix.pch;
 				INSTALL_PATH = /usr/local/lib;
 				PRODUCT_NAME = SDURLCache;
+				SDKROOT = iphoneos;
 			};
 			name = Debug;
 		};
@@ -267,6 +268,7 @@
 				GCC_PREFIX_HEADER = SDURLCache_Prefix.pch;
 				INSTALL_PATH = /usr/local/lib;
 				PRODUCT_NAME = SDURLCache;
+				SDKROOT = iphoneos;
 			};
 			name = Release;
 		};
@@ -298,7 +300,7 @@
 				OTHER_LDFLAGS = "-ObjC";
 				PREBINDING = NO;
 				RUN_CLANG_STATIC_ANALYZER = YES;
-				SDKROOT = iphoneos3.2;
+				SDKROOT = iphoneos;
 			};
 			name = Debug;
 		};
@@ -329,7 +331,7 @@
 				OTHER_LDFLAGS = "-ObjC";
 				PREBINDING = NO;
 				RUN_CLANG_STATIC_ANALYZER = YES;
-				SDKROOT = iphoneos3.2;
+				SDKROOT = iphoneos;
 			};
 			name = Release;
 		};
@@ -357,7 +359,7 @@
 				);
 				PREBINDING = NO;
 				PRODUCT_NAME = SDURLCacheTestBundle;
-				SDKROOT = iphoneos4.0;
+				SDKROOT = iphoneos;
 				WRAPPER_EXTENSION = octest;
 			};
 			name = Debug;
@@ -386,7 +388,7 @@
 				);
 				PREBINDING = NO;
 				PRODUCT_NAME = SDURLCacheTestBundle;
-				SDKROOT = iphoneos4.0;
+				SDKROOT = iphoneos;
 				WRAPPER_EXTENSION = octest;
 				ZERO_LINK = NO;
 			};
