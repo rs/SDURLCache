@@ -522,12 +522,12 @@ static NSDateFormatter* CreateDateFormatter(NSString *format)
 - (void)removeAllCachedResponses
 {
     [super removeAllCachedResponses];
-}
-
-- (BOOL)clearCache
-{
     NSFileManager *fileManager = [[[NSFileManager alloc] init] autorelease];
-    return [fileManager removeItemAtPath:diskCachePath error:NULL];
+    [fileManager removeItemAtPath:diskCachePath error:NULL];
+    @synchronized(self)
+    {
+        [diskCacheInfo release], diskCacheInfo = nil;
+    }
 }
 
 - (BOOL)isCached:(NSURL *)url

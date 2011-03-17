@@ -50,9 +50,4 @@
  */
 - (BOOL)isCached:(NSURL *)url;
 
-/*
- * Removes the cache contents.
- */
-- (BOOL)clearCache;
-
 @end
