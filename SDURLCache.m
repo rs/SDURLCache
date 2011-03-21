@@ -515,7 +515,17 @@ static NSDateFormatter* CreateDateFormatter(NSString *format)
 
                 // OPTI: Store the response to memory cache for potential future requests
                 [super storeCachedResponse:diskResponse forRequest:request];
-                return diskResponse;
+
+                // SRK: Work around an interesting retainCount bug in CFNetwork on iOS << 3.2.
+                if (kCFCoreFoundationVersionNumber < kCFCoreFoundationVersionNumber_iPhoneOS_3_2)
+                {
+                    diskResponse = [super cachedResponseForRequest:request];
+                }
+
+                if (diskResponse)
+                {
+                    return diskResponse;
+                }
             }
         }
     }
