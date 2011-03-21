@@ -69,7 +69,7 @@ static NSDateFormatter* CreateDateFormatter(NSString *format)
     if (hash.location == NSNotFound)
         return request;
 
-    NSMutableURLRequest *copy = request.mutableCopy;
+    NSMutableURLRequest *copy = [[request mutableCopy] autorelease];
     copy.URL = [NSURL URLWithString:[string substringToIndex:hash.location]];
     return copy;
 }
