@@ -157,7 +157,7 @@ static NSDateFormatter* CreateDateFormatter(NSString *format)
     NSString *cacheControl = [headers objectForKey:@"Cache-Control"];
     if (cacheControl)
     {
-        NSRange foundRange = [cacheControl rangeOfString:@"no-cache"];
+        NSRange foundRange = [cacheControl rangeOfString:@"no-store"];
         if (foundRange.length > 0)
         {
             // Can't be cached
