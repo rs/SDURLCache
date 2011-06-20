@@ -69,7 +69,7 @@
 
     // Cache-Control: no-cache with Expires in the future
     expDate = [SDURLCache expirationDateFromHeaders:[NSDictionary dictionaryWithObjectsAndKeys:@"no-cache", @"Cache-Control", futureDate, @"Expires", nil] withStatusCode:200];
-    STAssertNil(expDate, @"Cache-Control no-cache with Expires in the future");
+    STAssertTrue([expDate timeIntervalSinceNow] > 0, @"Cache-Control no-cache with Expires in the future");
 
     // Cache-Control with future date
     expDate = [SDURLCache expirationDateFromHeaders:[NSDictionary dictionaryWithObjectsAndKeys:@"public, max-age=1000", @"Cache-Control", nil] withStatusCode:200];
