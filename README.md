@@ -18,7 +18,7 @@ that's it, you instantly give on-disk HTTP request caching capability to your ap
 To save flash drive, SDURLCache doesn't cache on disk responses if cache expiration delay is lower
 than 5 minutes by default. You can change this behavior by changing the `minCacheInterval` property.
 
-Cache eviction is done automatically when disk capacity is outreached in a periodic maintenance
+Cache eviction is done automatically when disk capacity is reached in a periodic maintenance
 thread. All disk write operations are done in a separated thread so they can't block the main run
 loop.
 
