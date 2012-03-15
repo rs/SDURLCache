@@ -31,6 +31,8 @@ static NSDateFormatter* CreateDateFormatter(NSString *format)
 }
 
 @implementation NSCachedURLResponse(NSCoder)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wobjc-protocol-method-implementation"
 
 - (void)encodeWithCoder:(NSCoder *)coder
 {
@@ -47,6 +49,8 @@ static NSDateFormatter* CreateDateFormatter(NSString *format)
                          userInfo:[coder decodeObjectForKey:@"userInfo"]
                     storagePolicy:[coder decodeIntForKey:@"storagePolicy"]];
 }
+
+#pragma clang diagnostic pop
 
 @end
 
