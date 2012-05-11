@@ -13,7 +13,7 @@
     @private
     NSString *diskCachePath;
     NSMutableDictionary *diskCacheInfo;
-    BOOL diskCacheInfoDirty, ignoreMemoryOnlyStoragePolicy;
+    BOOL diskCacheInfoDirty, ignoreMemoryOnlyStoragePolicy, disabled;
     NSUInteger diskCacheUsage;
     NSTimeInterval minCacheInterval;
     NSOperationQueue *ioQueue;

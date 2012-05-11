@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		5318A9AB155DD7B500AB6767 /* SDCachedURLResponse.h in Headers */ = {isa = PBXBuildFile; fileRef = 5318A9A9155DD7B500AB6767 /* SDCachedURLResponse.h */; };
+		5318A9AC155DD7B500AB6767 /* SDCachedURLResponse.m in Sources */ = {isa = PBXBuildFile; fileRef = 5318A9AA155DD7B500AB6767 /* SDCachedURLResponse.m */; };
 		53F557F4114EA63600A3DA4B /* SDURLCache.h in Headers */ = {isa = PBXBuildFile; fileRef = 53F557F2114EA63600A3DA4B /* SDURLCache.h */; };
 		53F557F5114EA63600A3DA4B /* SDURLCache.m in Sources */ = {isa = PBXBuildFile; fileRef = 53F557F3114EA63600A3DA4B /* SDURLCache.m */; };
 		53F5592C114F1ED800A3DA4B /* SDURLCacheTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 53F5592B114F1ED800A3DA4B /* SDURLCacheTests.m */; };
@@ -25,6 +27,8 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		5318A9A9155DD7B500AB6767 /* SDCachedURLResponse.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SDCachedURLResponse.h; sourceTree = "<group>"; };
+		5318A9AA155DD7B500AB6767 /* SDCachedURLResponse.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = SDCachedURLResponse.m; sourceTree = "<group>"; };
 		53F557F2114EA63600A3DA4B /* SDURLCache.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SDURLCache.h; sourceTree = "<group>"; };
 		53F557F3114EA63600A3DA4B /* SDURLCache.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = SDURLCache.m; sourceTree = "<group>"; };
 		53F5591C114F1D5E00A3DA4B /* SDURLCacheTestBundle.octest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SDURLCacheTestBundle.octest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -86,6 +90,8 @@
 			children = (
 				53F557F2114EA63600A3DA4B /* SDURLCache.h */,
 				53F557F3114EA63600A3DA4B /* SDURLCache.m */,
+				5318A9A9155DD7B500AB6767 /* SDCachedURLResponse.h */,
+				5318A9AA155DD7B500AB6767 /* SDCachedURLResponse.m */,
 			);
 			name = Classes;
 			sourceTree = "<group>";
@@ -116,6 +122,7 @@
 			files = (
 				AA747D9F0F9514B9006C5449 /* SDURLCache_Prefix.pch in Headers */,
 				53F557F4114EA63600A3DA4B /* SDURLCache.h in Headers */,
+				5318A9AB155DD7B500AB6767 /* SDCachedURLResponse.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -227,6 +234,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				53F557F5114EA63600A3DA4B /* SDURLCache.m in Sources */,
+				5318A9AC155DD7B500AB6767 /* SDCachedURLResponse.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

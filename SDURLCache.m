@@ -7,7 +7,18 @@
 //
 
 #import "SDURLCache.h"
+#import "SDCachedURLResponse.h"
 #import <CommonCrypto/CommonDigest.h>
+#import <UIKit/UIDevice.h>
+
+// The removal of the NSCachedURLResponse category means that NSKeyedArchiver
+// will throw an EXC_BAD_ACCESS when attempting to load NSCachedURLResponse
+// data.
+// This means that this change requires a cache refresh, and a new cache key
+// namespace that will prevent this from happening.
+// Old cache keys will eventually be evicted from the system as new keys are
+// populated.
+static NSString *const kSDURLCacheVersion = @"V2";
 
 static NSTimeInterval const kSDURLCacheInfoDefaultMinCacheInterval = 5 * 60; // 5 minute
 static NSString *const kSDURLCacheInfoFileName = @"cacheInfo.plist";
@@ -29,31 +40,6 @@ static NSDateFormatter* CreateDateFormatter(NSString *format)
     
     return [dateFormatter autorelease];
 }
-
-@implementation NSCachedURLResponse(NSCoder)
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wobjc-protocol-method-implementation"
-
-- (void)encodeWithCoder:(NSCoder *)coder
-{
-    [coder encodeDataObject:self.data];
-    [coder encodeObject:self.response forKey:@"response"];
-    [coder encodeObject:self.userInfo forKey:@"userInfo"];
-    [coder encodeInt:self.storagePolicy forKey:@"storagePolicy"];
-}
-
-- (id)initWithCoder:(NSCoder *)coder
-{
-    return [self initWithResponse:[coder decodeObjectForKey:@"response"]
-                             data:[coder decodeDataObject]
-                         userInfo:[coder decodeObjectForKey:@"userInfo"]
-                    storagePolicy:[coder decodeIntForKey:@"storagePolicy"]];
-}
-
-#pragma clang diagnostic pop
-
-@end
-
 
 @interface SDURLCache ()
 @property (nonatomic, retain) NSString *diskCachePath;
@@ -87,8 +73,8 @@ static NSDateFormatter* CreateDateFormatter(NSString *format)
     const char *str = [url.absoluteString UTF8String];
     unsigned char r[CC_MD5_DIGEST_LENGTH];
     CC_MD5(str, strlen(str), r);
-    return [NSString stringWithFormat:@"%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
-            r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8], r[9], r[10], r[11], r[12], r[13], r[14], r[15]];
+    return [NSString stringWithFormat:@"%@_%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
+            kSDURLCacheVersion, r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8], r[9], r[10], r[11], r[12], r[13], r[14], r[15]];
 }
 
 /*
@@ -368,7 +354,8 @@ static NSDateFormatter* CreateDateFormatter(NSString *format)
 - (void)storeToDisk:(NSDictionary *)context
 {
     NSURLRequest *request = [context objectForKey:@"request"];
-    NSCachedURLResponse *cachedResponse = [context objectForKey:@"cachedResponse"];
+    // use wrapper to ensure we save appropriate fields
+    SDCachedURLResponse *cachedResponse = [SDCachedURLResponse cachedURLResponseWithNSCachedURLResponse:[context objectForKey:@"cachedResponse"]];
 
     NSString *cacheKey = [SDURLCache cacheKeyForURL:request.URL];
     NSString *cacheFilePath = [diskCachePath stringByAppendingPathComponent:cacheKey];
@@ -436,7 +423,12 @@ static NSDateFormatter* CreateDateFormatter(NSString *format)
 
 - (id)initWithMemoryCapacity:(NSUInteger)memoryCapacity diskCapacity:(NSUInteger)diskCapacity diskPath:(NSString *)path
 {
-    if ((self = [super initWithMemoryCapacity:memoryCapacity diskCapacity:diskCapacity diskPath:path]))
+    // iOS 5 implements disk caching. SDURLCache then disables itself at runtime if the current device OS
+    // version is 5 or greater
+    NSArray *version = [[UIDevice currentDevice].systemVersion componentsSeparatedByString:@"."];
+    disabled = [[version objectAtIndex:0] intValue] >= 5;
+
+    if ((self = [super initWithMemoryCapacity:memoryCapacity diskCapacity:diskCapacity diskPath:path]) && !disabled)
     {
         self.minCacheInterval = kSDURLCacheInfoDefaultMinCacheInterval;
         self.diskCachePath = path;
@@ -455,6 +447,12 @@ static NSDateFormatter* CreateDateFormatter(NSString *format)
 
 - (void)storeCachedResponse:(NSCachedURLResponse *)cachedResponse forRequest:(NSURLRequest *)request
 {
+    if (disabled)
+    {
+        [super storeCachedResponse:cachedResponse forRequest:request];
+        return;
+    }
+
     request = [SDURLCache canonicalRequestForRequest:request];
 
     if (request.cachePolicy == NSURLRequestReloadIgnoringLocalCacheData
@@ -500,6 +498,8 @@ static NSDateFormatter* CreateDateFormatter(NSString *format)
 
 - (NSCachedURLResponse *)cachedResponseForRequest:(NSURLRequest *)request
 {
+    if (disabled) return [super cachedResponseForRequest:request];
+
     request = [SDURLCache canonicalRequestForRequest:request];
 
     NSCachedURLResponse *memoryResponse = [super cachedResponseForRequest:request];
@@ -517,7 +517,10 @@ static NSDateFormatter* CreateDateFormatter(NSString *format)
         NSMutableDictionary *accesses = [self.diskCacheInfo objectForKey:kSDURLCacheInfoAccessesKey];
         if ([accesses objectForKey:cacheKey]) // OPTI: Check for cache-hit in a in-memory dictionary before hitting the file system
         {
-            NSCachedURLResponse *diskResponse = [NSKeyedUnarchiver unarchiveObjectWithFile:[diskCachePath stringByAppendingPathComponent:cacheKey]];
+            // load wrapper
+            SDCachedURLResponse *diskResponseWrapper = [NSKeyedUnarchiver unarchiveObjectWithFile:[diskCachePath stringByAppendingPathComponent:cacheKey]];
+            NSCachedURLResponse *diskResponse = diskResponseWrapper.response;
+
             if (diskResponse)
             {
                 // OPTI: Log the entry last access time for LRU cache eviction algorithm but don't save the dictionary
@@ -547,6 +550,8 @@ static NSDateFormatter* CreateDateFormatter(NSString *format)
 
 - (NSUInteger)currentDiskUsage
 {
+    if (disabled) return [super currentDiskUsage];
+
     if (!diskCacheInfo)
     {
         [self diskCacheInfo];
@@ -556,6 +561,12 @@ static NSDateFormatter* CreateDateFormatter(NSString *format)
 
 - (void)removeCachedResponseForRequest:(NSURLRequest *)request
 {
+    if (disabled)
+    {
+        [super removeCachedResponseForRequest:request];
+        return;
+    }
+
     request = [SDURLCache canonicalRequestForRequest:request];
 
     [super removeCachedResponseForRequest:request];
@@ -567,6 +578,7 @@ static NSDateFormatter* CreateDateFormatter(NSString *format)
 {
     [super removeAllCachedResponses];
     
+    if (disabled) return;
     NSFileManager *fileManager = [[NSFileManager alloc] init];
     [fileManager removeItemAtPath:diskCachePath error:NULL];
     [fileManager release];
@@ -586,7 +598,9 @@ static NSDateFormatter* CreateDateFormatter(NSString *format)
     {
         return YES;
     }
-    
+
+    if (disabled) return NO;
+
     NSString *cacheKey = [SDURLCache cacheKeyForURL:url];
     NSString *cacheFile = [diskCachePath stringByAppendingPathComponent:cacheKey];
     NSFileManager *manager = [[NSFileManager alloc] init];
@@ -605,6 +619,12 @@ static NSDateFormatter* CreateDateFormatter(NSString *format)
 
 - (void)dealloc
 {
+    if (disabled)
+    {
+        [super dealloc];
+        return;
+    }
+
     [periodicMaintenanceTimer invalidate];
     [periodicMaintenanceTimer release], periodicMaintenanceTimer = nil;
     [periodicMaintenanceOperation release], periodicMaintenanceOperation = nil;
