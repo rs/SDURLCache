@@ -428,6 +428,12 @@ static NSDateFormatter* CreateDateFormatter(NSString *format)
     NSArray *version = [[UIDevice currentDevice].systemVersion componentsSeparatedByString:@"."];
     disabled = [[version objectAtIndex:0] intValue] >= 5;
 
+    if (disabled)
+    {
+        // iOS NSURLCache doesn't accept a full path but a single path component
+        path = [path lastPathComponent];
+    }
+
     if ((self = [super initWithMemoryCapacity:memoryCapacity diskCapacity:diskCapacity diskPath:path]) && !disabled)
     {
         self.minCacheInterval = kSDURLCacheInfoDefaultMinCacheInterval;
