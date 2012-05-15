@@ -58,8 +58,8 @@
 
 - (void)dealloc
 {
-    [super dealloc];
     [response release], response = nil;
+    [super dealloc];
 }
 
 @end
