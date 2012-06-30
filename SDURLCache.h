@@ -13,7 +13,7 @@
     @private
     NSString *diskCachePath;
     NSMutableDictionary *diskCacheInfo;
-    BOOL diskCacheInfoDirty, ignoreMemoryOnlyStoragePolicy, disabled;
+    BOOL diskCacheInfoDirty, ignoreMemoryOnlyStoragePolicy, disabled, _enableForIOS5AndUp;
     NSUInteger diskCacheUsage;
     NSTimeInterval minCacheInterval;
     NSOperationQueue *ioQueue;
@@ -44,6 +44,16 @@
  * will be located in the application's cache directory and thus won't be synced by iTunes.
  */
 + (NSString *)defaultCachePath;
+
+/* 
+ * yosit: It turns that although ios > 5 has a disk cache it doesn't behave in a predicatable way
+ * the added enableForIOS5AndUp will enable SDURLCache to function like it does on all version of IOS
+ */
+
+- (id)initWithMemoryCapacity:(NSUInteger)memoryCapacity 
+                diskCapacity:(NSUInteger)diskCapacity 
+                    diskPath:(NSString *)path
+          enableForIOS5AndUp:(BOOL)enableForIOS5AndUp;
 
 /*
  * Checks if the provided URL exists in cache.
