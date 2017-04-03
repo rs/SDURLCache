@@ -536,8 +536,16 @@ static NSDateFormatter* CreateDateFormatter(NSString *format)
         if ([accesses objectForKey:cacheKey]) // OPTI: Check for cache-hit in a in-memory dictionary before hitting the file system
         {
             // load wrapper
-            SDCachedURLResponse *diskResponseWrapper = [NSKeyedUnarchiver unarchiveObjectWithFile:[diskCachePath stringByAppendingPathComponent:cacheKey]];
-            NSCachedURLResponse *diskResponse = diskResponseWrapper.response;
+            NSCachedURLResponse *diskResponse = nil;
+            NSString *cacheFile = [diskCachePath stringByAppendingPathComponent:cacheKey];
+            @try
+            {
+                diskResponse = [NSKeyedUnarchiver unarchiveObjectWithFile:cacheFile];
+            }
+            @catch (NSException *exception)
+            {
+                NSLog(@"Unable to load disk response from cache at \"%@\". Ignoring: %@", cacheFile, exception);
+            }
 
             if (diskResponse)
             {
